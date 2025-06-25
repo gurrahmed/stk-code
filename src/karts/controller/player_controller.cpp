@@ -47,7 +47,8 @@
 PlayerController::PlayerController(AbstractKart *kart)
                 : Controller(kart)
 {
-    m_penalty_ticks = 0;
+    m_penalty_ticks   = 0;
+    m_time_since_stuck = 0.0f;
 }   // PlayerController
 
 //-----------------------------------------------------------------------------
@@ -69,6 +70,7 @@ void PlayerController::reset()
     m_prev_accel    = 0;
     m_prev_nitro    = false;
     m_penalty_ticks = 0;
+    m_time_since_stuck = 0.0f;
 }   // reset
 
 // ----------------------------------------------------------------------------
@@ -84,6 +86,7 @@ void PlayerController::resetInputState()
     m_prev_brake            = 0;
     m_prev_accel            = 0;
     m_prev_nitro            = false;
+    m_time_since_stuck      = 0.0f;
     m_controls->reset();
 }   // resetInputState
 
@@ -300,6 +303,23 @@ void PlayerController::update(int ticks)
     {
         m_controls->setAccel(1.0f);
         m_prev_accel = Input::MAX_VALUE;
+
+        // Track how long the kart has been stationary and trigger an
+        // automatic rescue if necessary.
+        float dt = stk_config->ticks2Time(ticks);
+        if (m_kart->getSpeed() < 2.0f && !m_kart->getKartAnimation())
+        {
+            m_time_since_stuck += dt;
+            if (m_time_since_stuck > 2.0f)
+            {
+                RescueAnimation::create(m_kart);
+                m_time_since_stuck = 0.0f;
+            }
+        }
+        else
+        {
+            m_time_since_stuck = 0.0f;
+        }
     }
 
     // Only accept rescue if there is no kart animation is already playing
