@@ -606,24 +606,13 @@ PowerupManager::PowerupType PowerupManager::getRandomPowerup(unsigned int pos,
                                                              unsigned int *n,
                                                              uint64_t random_number)
 {
-    int powerup = m_current_item_weights.getRandomItem(pos-1, random_number);
-    if(powerup > POWERUP_LAST)
-    {
-        powerup -= (POWERUP_LAST-POWERUP_FIRST+1);
-        *n = 3;
-    }
-    else
-        *n=1;
-
-    // Prevents early explosive items
-    if (World::getWorld() && 
-        stk_config->ticks2Time(World::getWorld()->getTicksSinceStart()) <
-                                      stk_config->m_no_explosive_items_timeout)
-    {
-        if (powerup == POWERUP_CAKE || powerup == POWERUP_RUBBERBALL)
-            powerup = POWERUP_BOWLING;
-    }
-    return (PowerupType)powerup;
+    // Always return a zipper (nitro) so only nitro items are obtained from
+    // bonus boxes. The parameters are kept for compatibility with the
+    // original interface.
+    (void)pos;
+    (void)random_number;
+    *n = 1;
+    return POWERUP_ZIPPER;
 }   // getRandomPowerup
 
 // ============================================================================
