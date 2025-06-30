@@ -305,14 +305,19 @@ void PlayerController::update(int ticks)
         m_prev_accel = Input::MAX_VALUE;
 
         // Track how long the kart has been stationary and trigger an
-        // automatic rescue if necessary.
+        // automatic rescue if necessary. In network games the rescue
+        // request is sent to the server instead of being executed
+        // locally so that all clients stay in sync.
         float dt = stk_config->ticks2Time(ticks);
         if (m_kart->getSpeed() < 2.0f && !m_kart->getKartAnimation())
         {
             m_time_since_stuck += dt;
             if (m_time_since_stuck > 2.0f)
             {
-                RescueAnimation::create(m_kart);
+                if (NetworkConfig::get()->isNetworking())
+                    m_controls->setRescue(true);
+                else
+                    RescueAnimation::create(m_kart);
                 m_time_since_stuck = 0.0f;
             }
         }
@@ -321,6 +326,7 @@ void PlayerController::update(int ticks)
             m_time_since_stuck = 0.0f;
         }
     }
+
 
     // Only accept rescue if there is no kart animation is already playing
     // (e.g. if an explosion happens, wait till the explosion is over before
