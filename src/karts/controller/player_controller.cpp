@@ -304,21 +304,27 @@ void PlayerController::update(int ticks)
         m_controls->setAccel(1.0f);
         m_prev_accel = Input::MAX_VALUE;
 
-        // Track how long the kart has been stationary and trigger an
-        // automatic rescue if necessary.
-        float dt = stk_config->ticks2Time(ticks);
-        if (m_kart->getSpeed() < 2.0f && !m_kart->getKartAnimation())
+        // In network games the server is responsible for rescues. Trigger the
+        // automatic rescue only in offline races to avoid position
+        // desynchronisation and jitter when the client and server disagree.
+        if (!NetworkConfig::get()->isNetworking())
         {
-            m_time_since_stuck += dt;
-            if (m_time_since_stuck > 2.0f)
+            // Track how long the kart has been stationary and trigger an
+            // automatic rescue if necessary.
+            float dt = stk_config->ticks2Time(ticks);
+            if (m_kart->getSpeed() < 2.0f && !m_kart->getKartAnimation())
             {
-                RescueAnimation::create(m_kart);
+                m_time_since_stuck += dt;
+                if (m_time_since_stuck > 2.0f)
+                {
+                    RescueAnimation::create(m_kart);
+                    m_time_since_stuck = 0.0f;
+                }
+            }
+            else
+            {
                 m_time_since_stuck = 0.0f;
             }
-        }
-        else
-        {
-            m_time_since_stuck = 0.0f;
         }
     }
 
