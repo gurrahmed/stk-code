@@ -327,6 +327,7 @@ void PlayerController::update(int ticks)
         }
     }
 
+
     // Only accept rescue if there is no kart animation is already playing
     // (e.g. if an explosion happens, wait till the explosion is over before
     // starting any other animation).
