@@ -89,28 +89,14 @@ MainMenuScreen::MainMenuScreen() : Screen("main_menu.stkgui")
 
 void MainMenuScreen::loadedFromFile()
 {
-    LabelWidget* w = getWidget<LabelWidget>("info_addons");
-    w->setScrollSpeed(0.5f);
-    
     RibbonWidget* rw_top = getWidget<RibbonWidget>("menu_toprow");
     assert(rw_top != NULL);
-    
-    if (track_manager->getTrack("overworld") == NULL ||
-        track_manager->getTrack("introcutscene") == NULL ||
-        track_manager->getTrack("introcutscene2") == NULL)
-    {
-        rw_top->removeChildNamed("story");
-    }
 
-#if DEBUG_MENU_ITEM != 1
-    RibbonWidget* rw = getWidget<RibbonWidget>("menu_bottomrow");
-    rw->removeChildNamed("test_gpwin");
-    rw->removeChildNamed("test_gplose");
-    rw->removeChildNamed("test_unlocked");
-    rw->removeChildNamed("test_unlocked2");
-    rw->removeChildNamed("test_intro");
-    rw->removeChildNamed("test_outro");
-#endif
+    // Only keep the singleplayer and online buttons
+    rw_top->removeChildNamed("story");
+    rw_top->removeChildNamed("multiplayer");
+    rw_top->removeChildNamed("addons");
+
 }   // loadedFromFile
 
 // ----------------------------------------------------------------------------
@@ -164,14 +150,6 @@ void MainMenuScreen::init()
     input_manager->getDeviceManager()->clearLatestUsedDevice();
 
 #ifndef SERVER_ONLY
-    if (addons_manager && addons_manager->isLoading())
-    {
-        IconButtonWidget* w = getWidget<IconButtonWidget>("addons");
-        w->setActive(false);
-        w->resetAllBadges();
-        w->setBadge(LOADING_BADGE);
-    }
-
     // Initialize news iteration, show dialog when there's important news
     NewsManager::get()->resetNewsPtr(NewsManager::NTYPE_MAINMENU);
 
@@ -229,19 +207,9 @@ void MainMenuScreen::init()
         NewsManager::get()->getNextNewsID(NewsManager::NTYPE_LIST);
     }
 
-    m_news_text = L"";
-    LabelWidget* w = getWidget<LabelWidget>("info_addons");
-    w->setText(m_news_text, true);
-    w->update(0.01f);
 #endif
 
-    RibbonWidget* r = getWidget<RibbonWidget>("menu_bottomrow");
-    // FIXME: why do I need to do this manually
-    ((IconButtonWidget*)r->getChildren().get(0))->unfocused(PLAYER_ID_GAME_MASTER, NULL);
-    ((IconButtonWidget*)r->getChildren().get(1))->unfocused(PLAYER_ID_GAME_MASTER, NULL);
-    ((IconButtonWidget*)r->getChildren().get(2))->unfocused(PLAYER_ID_GAME_MASTER, NULL);
-
-    r = getWidget<RibbonWidget>("menu_toprow");
+    RibbonWidget* r = getWidget<RibbonWidget>("menu_toprow");
     r->setFocusForPlayer(PLAYER_ID_GAME_MASTER);
     DemoWorld::resetIdleTime();
 
@@ -260,63 +228,6 @@ void MainMenuScreen::onUpdate(float delta)
 #ifndef SERVER_ONLY
     NewsManager::get()->joinDownloadThreadIfExit();
 
-    IconButtonWidget* addons_icon = getWidget<IconButtonWidget>("addons");
-    if (addons_icon != NULL)
-    {
-        if (addons_manager->wasError())
-        {
-            addons_icon->setActive(true);
-            addons_icon->resetAllBadges();
-            addons_icon->setBadge(BAD_BADGE);
-        }
-        else if (addons_manager->isLoading() && UserConfigParams::m_internet_status
-            == Online::RequestManager::IPERM_ALLOWED)
-        {
-            // Addons manager is still initialising/downloading.
-            addons_icon->setActive(false);
-            addons_icon->resetAllBadges();
-            addons_icon->setBadge(LOADING_BADGE);
-        }
-        else
-        {
-            addons_icon->setActive(true);
-            addons_icon->resetAllBadges();
-            if (addons_manager->hasNewAddons())
-                addons_icon->setBadge(DOWN_BADGE);
-        }
-        // maybe add a new badge when not allowed to access the net
-    }
-
-    LabelWidget* w = getWidget<LabelWidget>("info_addons");
-    
-    if (w->getText().empty() || w->scrolledOff())
-    {
-        // Show important messages seperately
-        // Concatrate adjacent unimportant messages together
-        m_news_text = L"";
-        
-        int news_count = NewsManager::get()->getNewsCount(NewsManager::NTYPE_MAINMENU);
-
-        while (news_count--)
-        {
-            bool important = NewsManager::get()->isCurrentNewsImportant(NewsManager::NTYPE_MAINMENU);
-            if (!m_news_text.empty())
-            {
-                m_news_text += "  +++  ";
-            }
-            m_news_text += NewsManager::get()->getCurrentNewsMessage(NewsManager::NTYPE_MAINMENU);
-
-            NewsManager::get()->getNextNewsID(NewsManager::NTYPE_MAINMENU);
-
-            if (important || NewsManager::get()->isCurrentNewsImportant(NewsManager::NTYPE_MAINMENU))
-            {
-                break;
-            }
-        }
-
-        w->setText(m_news_text, true);
-    }
-    w->update(delta);
 
     PlayerProfile *player = PlayerManager::getCurrentPlayer();
     if (!player)

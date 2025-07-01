@@ -34,6 +34,9 @@ protected:
     bool           m_prev_nitro;
 
     int            m_penalty_ticks;
+    /** Time the kart has been nearly stationary. Used to trigger an
+     *  automatic rescue if the kart doesn't move for a while. */
+    float          m_time_since_stuck;
 
     virtual void  steer(int ticks, int steer_val);
 
