@@ -194,6 +194,11 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         // Enable nitro only when also accelerating
         SET_OR_TEST_GETTER(Nitro, ((value!=0) && m_controls->getAccel()) );
         break;
+
+    case PA_RESCUE:
+        SET_OR_TEST_GETTER(Rescue, value != 0);
+        break;
+ 
     case PA_PAUSE_RACE:
         if (value != 0) StateManager::get()->escapePressed();
         break;
@@ -327,7 +332,10 @@ void PlayerController::update(int ticks)
             if (m_time_since_stuck > 2.0f)
             {
                 if (NetworkConfig::get()->isNetworking())
+                    action(PA_RESCUE, Input::MAX_VALUE);
+
                     m_controls->setRescue(true);
+
                 else
                     RescueAnimation::create(m_kart);
                 m_time_since_stuck = 0.0f;
