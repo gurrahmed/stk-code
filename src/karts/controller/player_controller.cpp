@@ -176,6 +176,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
             SET_OR_TEST(m_steer_val, m_steer_val_l);
 
         break;
+
     case PA_ACCEL:
     {
         // Handle throttle input so that online games receive an acceleration
@@ -186,15 +187,18 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         SET_OR_TEST_GETTER(Accel, v16 / (float)Input::MAX_VALUE);
         break;
     }
+
     case PA_NITRO:
         // This basically keeps track whether the button still is being pressed
         SET_OR_TEST(m_prev_nitro, value != 0 );
         // Enable nitro only when also accelerating
         SET_OR_TEST_GETTER(Nitro, ((value!=0) && m_controls->getAccel()) );
         break;
+
     case PA_RESCUE:
         SET_OR_TEST_GETTER(Rescue, value != 0);
         break;
+ 
     case PA_PAUSE_RACE:
         if (value != 0) StateManager::get()->escapePressed();
         break;
@@ -329,6 +333,9 @@ void PlayerController::update(int ticks)
             {
                 if (NetworkConfig::get()->isNetworking())
                     action(PA_RESCUE, Input::MAX_VALUE);
+
+                    m_controls->setRescue(true);
+
                 else
                     RescueAnimation::create(m_kart);
                 m_time_since_stuck = 0.0f;
