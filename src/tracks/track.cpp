@@ -2738,11 +2738,12 @@ void Track::itemCommand(const XMLNode *node)
         return;
 
     Item::ItemType type;
-    if     (name=="banana"     ) type = Item::ITEM_BANANA;
-    else if(name=="item"       ) type = Item::ITEM_BONUS_BOX;
-    else if(name=="small-nitro") type = Item::ITEM_NITRO_SMALL;
-    else if(name=="easter-egg" ) type = Item::ITEM_EASTER_EGG;
-    else                         type = Item::ITEM_NITRO_BIG;
+    if (name == "small-nitro")
+        type = Item::ITEM_NITRO_SMALL;
+    else
+        // Replace all other item types with big nitro so only nitro items
+        // appear on the track
+        type = Item::ITEM_NITRO_BIG;
     Vec3 xyz;
     // Set some kind of default in case Y is not defined in the file
     // (with the new track exporter it always is defined anyway).
