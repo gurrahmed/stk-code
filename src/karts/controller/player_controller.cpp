@@ -176,6 +176,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
             SET_OR_TEST(m_steer_val, m_steer_val_l);
 
         break;
+
     case PA_ACCEL:
     {
         // Handle throttle input so that online games receive an acceleration
@@ -186,6 +187,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         SET_OR_TEST_GETTER(Accel, v16 / (float)Input::MAX_VALUE);
         break;
     }
+
     case PA_NITRO:
         // This basically keeps track whether the button still is being pressed
         SET_OR_TEST(m_prev_nitro, value != 0 );
