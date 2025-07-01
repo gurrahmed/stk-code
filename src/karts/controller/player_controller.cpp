@@ -174,7 +174,9 @@ void PlayerController::actionFromNetwork(PlayerAction p_action, int value,
 {
     m_steer_val_l = value_l;
     m_steer_val_r = value_r;
-    PlayerController::action(p_action, value, /*dry_run*/false);
+    // Reuse the action handler but avoid dispatching additional network
+    // events by passing 'false' directly for the dry_run parameter.
+    PlayerController::action(p_action, value, false);
 }   // actionFromNetwork
 
 //-----------------------------------------------------------------------------
@@ -215,6 +217,9 @@ void PlayerController::steer(int ticks, int steer_val)
     // Once the race has started check for the kart being stuck and trigger
     // an automatic rescue if it doesn't move for too long. In network games
     // the rescue request is sent to the server so all clients stay in sync.
+
+    if (!World::getWorld()->isStartPhase() &&
+        !NetworkConfig::get()->isNetworking())
     if (!World::getWorld()->isStartPhase())
     {
         // Track how long the kart has been stationary and trigger an
@@ -225,10 +230,14 @@ void PlayerController::steer(int ticks, int steer_val)
             m_time_since_stuck += dt;
             if (m_time_since_stuck > 2.0f)
             {
+
+                RescueAnimation::create(m_kart);
+
                 if (NetworkConfig::get()->isNetworking())
                     action(PA_RESCUE, Input::MAX_VALUE);
                 else
                     RescueAnimation::create(m_kart);
+
                 m_time_since_stuck = 0.0f;
             }
         }
