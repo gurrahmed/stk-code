@@ -21,6 +21,7 @@
 
 #include "config/user_config.hpp"
 #include "input/input_manager.hpp"
+#include "input/input.hpp"
 #include "items/attachment.hpp"
 #include "items/item.hpp"
 #include "items/powerup.hpp"
@@ -46,7 +47,8 @@
 PlayerController::PlayerController(AbstractKart *kart)
                 : Controller(kart)
 {
-    m_penalty_ticks = 0;
+    m_penalty_ticks   = 0;
+    m_time_since_stuck = 0.0f;
 }   // PlayerController
 
 //-----------------------------------------------------------------------------
@@ -68,6 +70,7 @@ void PlayerController::reset()
     m_prev_accel    = 0;
     m_prev_nitro    = false;
     m_penalty_ticks = 0;
+    m_time_since_stuck = 0.0f;
 }   // reset
 
 // ----------------------------------------------------------------------------
@@ -83,6 +86,7 @@ void PlayerController::resetInputState()
     m_prev_brake            = 0;
     m_prev_accel            = 0;
     m_prev_nitro            = false;
+    m_time_since_stuck      = 0.0f;
     m_controls->reset();
 }   // resetInputState
 
@@ -174,39 +178,14 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         break;
     case PA_ACCEL:
     {
+        // Handle throttle input so that online games receive an acceleration
+        // event once the race begins.  The value is expected to be in the
+        // range [0, Input::MAX_VALUE].
         uint16_t v16 = (uint16_t)value;
         SET_OR_TEST(m_prev_accel, v16);
-        if (v16)
-        {
-            SET_OR_TEST_GETTER(Accel, v16 / 32768.0f);
-            SET_OR_TEST_GETTER(Brake, false);
-            SET_OR_TEST_GETTER(Nitro, m_prev_nitro);
-        }
-        else
-        {
-            SET_OR_TEST_GETTER(Accel, 0.0f);
-            SET_OR_TEST_GETTER(Brake, m_prev_brake);
-            SET_OR_TEST_GETTER(Nitro, false);
-        }
+        SET_OR_TEST_GETTER(Accel, v16 / (float)Input::MAX_VALUE);
         break;
     }
-    case PA_BRAKE:
-        SET_OR_TEST(m_prev_brake, value!=0);
-        // let's consider below that to be a deadzone
-        if(value > 32768/2)
-        {
-            SET_OR_TEST_GETTER(Brake, true);
-            SET_OR_TEST_GETTER(Accel, 0.0f);
-            SET_OR_TEST_GETTER(Nitro, false);
-        }
-        else
-        {
-            SET_OR_TEST_GETTER(Brake, false);
-            SET_OR_TEST_GETTER(Accel, m_prev_accel/32768.0f);
-            // Nitro still depends on whether we're accelerating
-            SET_OR_TEST_GETTER(Nitro, m_prev_nitro && m_prev_accel);
-        }
-        break;
     case PA_NITRO:
         // This basically keeps track whether the button still is being pressed
         SET_OR_TEST(m_prev_nitro, value != 0 );
@@ -214,38 +193,14 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         SET_OR_TEST_GETTER(Nitro, ((value!=0) && m_controls->getAccel()) );
         break;
     case PA_RESCUE:
-        SET_OR_TEST_GETTER(Rescue, value!=0);
-        break;
-    case PA_FIRE:
-        SET_OR_TEST_GETTER(Fire, value!=0);
-        break;
-    case PA_LOOK_BACK:
-        SET_OR_TEST_GETTER(LookBack, value!=0);
-        break;
-    case PA_DRIFT:
-        if (value == 0)
-        {
-            SET_OR_TEST_GETTER(SkidControl, KartControl::SC_NONE);
-        }
-        else if (m_controls->getSkidControl() == KartControl::SC_NONE)
-        {
-            if (m_steer_val == 0)
-            {
-                SET_OR_TEST_GETTER(SkidControl, KartControl::SC_NO_DIRECTION);
-            }
-            else
-            {
-                SET_OR_TEST_GETTER(SkidControl, m_steer_val<0
-                                                ? KartControl::SC_RIGHT
-                                                : KartControl::SC_LEFT  );
-            }
-        }
+        SET_OR_TEST_GETTER(Rescue, value != 0);
         break;
     case PA_PAUSE_RACE:
         if (value != 0) StateManager::get()->escapePressed();
         break;
     default:
-       break;
+        // Ignore all other actions so that only steering and nitro are active
+        return !dry_run;
     }
     if (dry_run) return false;
     return true;
@@ -353,6 +308,32 @@ void PlayerController::update(int ticks)
         m_controls->setBrake(false);
         m_controls->setAccel(0.0f);
         return;
+    }
+
+    // Once the race has started check for the kart being stuck and trigger
+    // an automatic rescue if it doesn't move for too long. In network games
+    // the rescue request is sent to the server so all clients stay in sync.
+    if (!World::getWorld()->isStartPhase())
+    {
+        // Track how long the kart has been stationary and trigger an
+        // automatic rescue if necessary.
+        float dt = stk_config->ticks2Time(ticks);
+        if (m_kart->getSpeed() < 2.0f && !m_kart->getKartAnimation())
+        {
+            m_time_since_stuck += dt;
+            if (m_time_since_stuck > 2.0f)
+            {
+                if (NetworkConfig::get()->isNetworking())
+                    action(PA_RESCUE, Input::MAX_VALUE);
+                else
+                    RescueAnimation::create(m_kart);
+                m_time_since_stuck = 0.0f;
+            }
+        }
+        else
+        {
+            m_time_since_stuck = 0.0f;
+        }
     }
 
     // Only accept rescue if there is no kart animation is already playing
