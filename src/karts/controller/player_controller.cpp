@@ -113,47 +113,7 @@ void PlayerController::resetInputState()
  *  \return        If dry_run is set, will return true if this action will
  *                 cause a state change. If dry_run is not set, will return
  *                 false.
- */
-bool PlayerController::action(PlayerAction action, int value, bool dry_run)
-{
-    /** If dry_run (parameter) is true, this macro tests if this action would
-     *  trigger a state change in the specified variable (without actually
-     *  doing it). If it will trigger a state change, the macro will
-     *  immediatley return to the caller. If dry_run is false, it will only
-     *  assign the new value to the variable (and not return to the user
-     *  early). The do-while(0) helps using this macro e.g. in the 'then'
-     *  clause of an if statement. */
-#define SET_OR_TEST(var, value)                \
-    do                                         \
-    {                                          \
-        if(dry_run)                            \
-        {                                      \
-            if (var != (value) ) return true;  \
-        }                                      \
-        else                                   \
-        {                                      \
-            var = value;                       \
-        }                                      \
-    } while(0)
-
-    /** Basically the same as the above macro, but is uses getter/setter
-     *  functions. The name of the setter/getter is set'name'(value) and
-     *  get'name'(). */
-#define SET_OR_TEST_GETTER(name, value)                           \
-    do                                                            \
-    {                                                             \
-        if(dry_run)                                               \
-        {                                                         \
-            if (m_controls->get##name() != (value) ) return true; \
-        }                                                         \
-        else                                                      \
-        {                                                         \
-            m_controls->set##name(value);                         \
-        }                                                         \
-    } while(0)
-
-    switch (action)
-    {
+@@ -152,122 +156,73 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
     case PA_STEER_LEFT:
         SET_OR_TEST(m_steer_val_l, value);
         if (value)
@@ -229,65 +189,7 @@ void PlayerController::steer(int ticks, int steer_val)
     // and set it at the end of this function
     float steer = m_controls->getSteer();
     if(stk_config->m_disable_steer_while_unskid &&
-        m_controls->getSkidControl()==KartControl::SC_NONE &&
-       m_kart->getSkidding()->getVisualSkidRotation()!=0)
-    {
-        steer = 0;
-    }
-
-    // Amount the steering is changed for digital devices.
-    // If the steering is 'back to straight', a different steering
-    // change speed is used.
-    float dt = stk_config->ticks2Time(ticks);
-    const float STEER_CHANGE = ( (steer_val<=0 && steer<0) ||
-                                 (steer_val>=0 && steer>0)   )
-                     ? dt/m_kart->getKartProperties()->getTurnTimeResetSteer()
-                     : dt/m_kart->getTimeFullSteer(fabsf(steer));
-    if (steer_val < 0)
-    {
-        steer += STEER_CHANGE;
-        steer = std::min(steer, -steer_val/32767.0f);
-    }
-    else if(steer_val > 0)
-    {
-        steer -= STEER_CHANGE;
-        steer = std::max(steer, -steer_val/32767.0f);
-    }
-    else
-    {   // no key is pressed
-        if(steer>0.0f)
-        {
-            steer -= STEER_CHANGE;
-            if(steer<0.0f) steer=0.0f;
-        }
-        else
-        {   // steer<=0.0f;
-            steer += STEER_CHANGE;
-            if(steer>0.0f) steer=0.0f;
-        }   // if steer<=0.0f
-    }   // no key is pressed
-    m_controls->setSteer(std::min(1.0f, std::max(-1.0f, steer)) );
-
-}   // steer
-
-//-----------------------------------------------------------------------------
-/** Callback when the skidding bonus is triggered. The player controller
- *  resets the current steering to 0, which makes the kart easier to control.
- */
-void PlayerController::skidBonusTriggered()
-{
-    m_controls->setSteer(0);
-}   // skidBonusTriggered
-
-//-----------------------------------------------------------------------------
-/** Updates the player kart, called once each timestep.
- */
-void PlayerController::update(int ticks)
-{
-    steer(ticks, m_steer_val);
-
-    if (World::getWorld()->isStartPhase())
-    {
+@@ -333,50 +288,76 @@ void PlayerController::update(int ticks)
         if ((m_controls->getAccel() || m_controls->getBrake()||
             m_controls->getNitro()) && !NetworkConfig::get()->isNetworking())
         {
@@ -314,17 +216,30 @@ void PlayerController::update(int ticks)
     }
 
     // Once the race has started check for the kart being stuck and trigger
+
     // an automatic rescue if it doesn't move for too long. In online races
     // a rescue request is sent to the server instead so every client stays
     // in sync.
     if (!World::getWorld()->isStartPhase() && isLocalPlayerController())
     {
+
+    // an automatic rescue if it doesn't move for too long. In network games
+    // the rescue request is sent to the server so all clients stay in sync.
+
+    if (!World::getWorld()->isStartPhase() &&
+        !NetworkConfig::get()->isNetworking())
+    if (!World::getWorld()->isStartPhase())
+    {
+        // Track how long the kart has been stationary and trigger an
+        // automatic rescue if necessary.
+
         float dt = stk_config->ticks2Time(ticks);
         if (m_kart->getSpeed() < 2.0f && !m_kart->getKartAnimation())
         {
             m_time_since_stuck += dt;
             if (m_time_since_stuck > 2.0f)
             {
+
                 if (NetworkConfig::get()->isNetworking())
                 {
                     if (auto gp = GameProtocol::lock())
@@ -338,6 +253,16 @@ void PlayerController::update(int ticks)
                 {
                     RescueAnimation::create(m_kart);
                 }
+
+
+                RescueAnimation::create(m_kart);
+
+                if (NetworkConfig::get()->isNetworking())
+                    action(PA_RESCUE, Input::MAX_VALUE);
+                else
+                    RescueAnimation::create(m_kart);
+
+
                 m_time_since_stuck = 0.0f;
             }
         }
@@ -372,45 +297,3 @@ bool PlayerController::saveState(BareNetworkString *buffer) const
     // restore state MUST be adjusted!!
     int steer_abs = std::abs(m_steer_val);
     buffer->addUInt16((uint16_t)steer_abs).addUInt16(m_prev_accel)
-        .addUInt8((m_prev_brake ? 1 : 0) | (m_prev_nitro ? 2 : 0));
-    return m_steer_val < 0;
-}   // copyToBuffer
-
-//-----------------------------------------------------------------------------
-void PlayerController::rewindTo(BareNetworkString *buffer)
-{
-    // NOTE: when the size changes, the AIBaseController::saveState and
-    // restore state MUST be adjusted!!
-    m_steer_val  = buffer->getUInt16();
-    m_prev_accel = buffer->getUInt16();
-    uint8_t c = buffer->getUInt8();
-    m_prev_brake = (c & 1) != 0;
-    m_prev_nitro = (c & 2) != 0;
-}   // rewindTo
-
-// ----------------------------------------------------------------------------
-core::stringw PlayerController::getName(bool include_handicap_string) const
-{
-    core::stringw name = m_kart->getName();
-    if (NetworkConfig::get()->isNetworking())
-    {
-        const RemoteKartInfo& rki = RaceManager::get()->getKartInfo(
-            m_kart->getWorldKartId());
-        name = rki.getPlayerName();
-        if (include_handicap_string && rki.getHandicap() == HANDICAP_MEDIUM)
-        {
-#ifdef SERVER_ONLY
-            name += L" (handicapped)";
-#else
-            name = _("%s (handicapped)", name);
-#endif
-        }
-    }
-    return name;
-}   // getName
-
-// ----------------------------------------------------------------------------
-void PlayerController::displayPenaltyWarning()
-{
-    m_penalty_ticks = stk_config->m_penalty_ticks;
-}   // displayPenaltyWarning
