@@ -35,6 +35,7 @@
 #include "network/network_config.hpp"
 #include "network/network_player_profile.hpp"
 #include "network/network_string.hpp"
+#include "network/protocols/game_protocol.hpp"
 #include "race/history.hpp"
 #include "states_screens/race_gui_base.hpp"
 #include "utils/constants.hpp"
@@ -215,6 +216,13 @@ void PlayerController::steer(int ticks, int steer_val)
     }
 
     // Once the race has started check for the kart being stuck and trigger
+
+    // an automatic rescue if it doesn't move for too long. In online races
+    // a rescue request is sent to the server instead so every client stays
+    // in sync.
+    if (!World::getWorld()->isStartPhase() && isLocalPlayerController())
+    {
+
     // an automatic rescue if it doesn't move for too long. In network games
     // the rescue request is sent to the server so all clients stay in sync.
 
@@ -224,6 +232,7 @@ void PlayerController::steer(int ticks, int steer_val)
     {
         // Track how long the kart has been stationary and trigger an
         // automatic rescue if necessary.
+
         float dt = stk_config->ticks2Time(ticks);
         if (m_kart->getSpeed() < 2.0f && !m_kart->getKartAnimation())
         {
@@ -231,12 +240,28 @@ void PlayerController::steer(int ticks, int steer_val)
             if (m_time_since_stuck > 2.0f)
             {
 
+                if (NetworkConfig::get()->isNetworking())
+                {
+                    if (auto gp = GameProtocol::lock())
+                    {
+                        gp->controllerAction(m_kart->getWorldKartId(),
+                                             PA_RESCUE, Input::MAX_VALUE,
+                                             m_steer_val_l, m_steer_val_r);
+                    }
+                }
+                else
+                {
+                    RescueAnimation::create(m_kart);
+                }
+
+
                 RescueAnimation::create(m_kart);
 
                 if (NetworkConfig::get()->isNetworking())
                     action(PA_RESCUE, Input::MAX_VALUE);
                 else
                     RescueAnimation::create(m_kart);
+
 
                 m_time_since_stuck = 0.0f;
             }
