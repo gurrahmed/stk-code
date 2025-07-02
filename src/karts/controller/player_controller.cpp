@@ -20,6 +20,7 @@
 
 #include "karts/controller/player_controller.hpp"
 
+#include "utils/string_utils.hpp"
 #include "audio/sfx_manager.hpp"
 #include "config/user_config.hpp"
 #include "input/input.hpp"
@@ -285,9 +286,9 @@ void PlayerController::displayPenaltyWarning()
     if (!isLocalPlayerController()) return;
 
     core::stringw msg = _("False start!  Brakes locked for two seconds.");
-    RaceGUIBase::displayGeneralRaceMessage(msg, 2.0f);
-    m_penalty_ticks = World::getWorld()->getTicksSinceStart() +
-                      stk_config->seconds2Ticks(2.0f);
+    Log::info("PlayerController", "False-start penalty triggered");   // basic feedback; hook into GUI later
+    m_penalty_ticks = World::getWorld()->getTicksSinceStart() + stk_config->time2Ticks(2.0f);
+
 }
 
 void PlayerController::rewindTo(BareNetworkString* buffer)
@@ -300,7 +301,8 @@ void PlayerController::rewindTo(BareNetworkString* buffer)
 
 core::stringw PlayerController::getName(bool /*short_name*/) const
 {
-    return m_kart->getDriverName();
+    return m_kart->getKartProperties()->getName();
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
