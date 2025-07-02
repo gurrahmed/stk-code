@@ -29,6 +29,7 @@
 #include "graphics/particle_emitter.hpp"
 #include "graphics/particle_kind.hpp"
 #include "input/input_manager.hpp"
+#include "input/input.hpp"
 #include "items/attachment.hpp"
 #include "items/item.hpp"
 #include "items/powerup.hpp"
@@ -253,6 +254,12 @@ void LocalPlayerController::update(int ticks)
         // get received in which order in the one frame.
         Log::debug("LocalPlayerController", "irr_driver", "-------------------------------------");
     }
+
+    // Automatically engage acceleration once the race actually starts so
+    // network games receive the input like a normal key press.  This avoids
+    // the kart being stationary online due to missing acceleration events.
+    if (!m_has_started && !World::getWorld()->isStartPhase())
+        action(PA_ACCEL, Input::MAX_VALUE);
 
     PlayerController::update(ticks);
 
