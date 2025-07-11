@@ -1,4 +1,3 @@
-
 //
 //  SuperTuxKart - a fun racing game with go-kart
 //  Copyright (C) 2004-2015 Steve Baker <sjbaker1@airmail.net>
@@ -36,6 +35,7 @@
 #include "network/network_config.hpp"
 #include "network/network_player_profile.hpp"
 #include "network/network_string.hpp"
+#include "network/protocols/game_protocol.hpp"
 #include "race/history.hpp"
 #include "states_screens/race_gui_base.hpp"
 #include "utils/constants.hpp"
@@ -177,11 +177,24 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
             SET_OR_TEST(m_steer_val, m_steer_val_l);
 
         break;
+    case PA_ACCEL:
+    {
+        // Handle throttle input so that online games receive an acceleration
+        // event once the race begins.  The value is expected to be in the
+        // range [0, Input::MAX_VALUE].
+        uint16_t v16 = (uint16_t)value;
+        SET_OR_TEST(m_prev_accel, v16);
+        SET_OR_TEST_GETTER(Accel, v16 / (float)Input::MAX_VALUE);
+        break;
+    }
     case PA_NITRO:
         // This basically keeps track whether the button still is being pressed
         SET_OR_TEST(m_prev_nitro, value != 0 );
         // Enable nitro only when also accelerating
         SET_OR_TEST_GETTER(Nitro, ((value!=0) && m_controls->getAccel()) );
+        break;
+    case PA_RESCUE:
+        SET_OR_TEST_GETTER(Rescue, value != 0);
         break;
     case PA_PAUSE_RACE:
         if (value != 0) StateManager::get()->escapePressed();
@@ -202,7 +215,9 @@ void PlayerController::actionFromNetwork(PlayerAction p_action, int value,
 {
     m_steer_val_l = value_l;
     m_steer_val_r = value_r;
-    PlayerController::action(p_action, value, /*dry_run*/false);
+    // Reuse the action handler but avoid dispatching additional network
+    // events by passing 'false' directly for the dry_run parameter.
+    PlayerController::action(p_action, value, false);
 }   // actionFromNetwork
 
 //-----------------------------------------------------------------------------
@@ -298,17 +313,12 @@ void PlayerController::update(int ticks)
         return;
     }
 
-    // Automatically accelerate once the race has started and no penalty is
-    // active so that players only need to steer and use nitro.
-    if (!World::getWorld()->isStartPhase())
+    // Once the race has started check for the kart being stuck and trigger
+    // an automatic rescue if it doesn't move for too long. In online races
+    // a rescue request is sent to the server instead so every client stays
+    // in sync.
+    if (!World::getWorld()->isStartPhase() && isLocalPlayerController())
     {
-        m_controls->setAccel(1.0f);
-        m_prev_accel = Input::MAX_VALUE;
-
-        // Track how long the kart has been stationary and trigger an
-        // automatic rescue if necessary. In network games the rescue
-        // request is sent to the server instead of being executed
-        // locally so that all clients stay in sync.
         float dt = stk_config->ticks2Time(ticks);
         if (m_kart->getSpeed() < 2.0f && !m_kart->getKartAnimation())
         {
@@ -316,9 +326,18 @@ void PlayerController::update(int ticks)
             if (m_time_since_stuck > 2.0f)
             {
                 if (NetworkConfig::get()->isNetworking())
-                    m_controls->setRescue(true);
+                {
+                    if (auto gp = GameProtocol::lock())
+                    {
+                        gp->controllerAction(m_kart->getWorldKartId(),
+                                             PA_RESCUE, Input::MAX_VALUE,
+                                             m_steer_val_l, m_steer_val_r);
+                    }
+                }
                 else
+                {
                     RescueAnimation::create(m_kart);
+                }
                 m_time_since_stuck = 0.0f;
             }
         }
@@ -327,7 +346,6 @@ void PlayerController::update(int ticks)
             m_time_since_stuck = 0.0f;
         }
     }
-
 
     // Only accept rescue if there is no kart animation is already playing
     // (e.g. if an explosion happens, wait till the explosion is over before
