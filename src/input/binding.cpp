@@ -148,7 +148,7 @@ irr::core::stringw Binding::getAsString() const
              //I18N: input configuration screen: keyboard key
             case irr::IRR_KEY_LEFT       : s = _C("input_key", "Left"); break;
              //I18N: input configuration screen: keyboard key
-            case irr::IRR_KEY_UP         : s = _C("input_key", "Up"); break;
+            case irr::IRR_KEY_UNKNOWN         : s = _C("input_key", "Up"); break;
              //I18N: input configuration screen: keyboard key
             case irr::IRR_KEY_RIGHT      : s = _C("input_key", "Right"); break;
              //I18N: input configuration screen: keyboard key
