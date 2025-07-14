@@ -37,6 +37,9 @@ protected:
     /** Time the kart has been nearly stationary. Used to trigger an
      *  automatic rescue if the kart doesn't move for a while. */
     float          m_time_since_stuck;
+    bool           m_autoAccelEnabled;  
+    float          m_autoAccelValue;    
+    bool           m_wasStartPhase;     
 
     virtual void  steer(int ticks, int steer_val);
 
