@@ -46,7 +46,10 @@
 #include <cstdlib>
 
 PlayerController::PlayerController(AbstractKart *kart)
-                : Controller(kart)
+                : Controller(kart),
+                m_autoAccelEnabled(false),
+                m_autoAccelValue(1.0f),
+                m_wasStartPhase(true)
 {
     m_penalty_ticks   = 0;
     m_time_since_stuck = 0.0f;
@@ -72,6 +75,9 @@ void PlayerController::reset()
     m_prev_nitro    = false;
     m_penalty_ticks = 0;
     m_time_since_stuck = 0.0f;
+    m_autoAccelEnabled = false;
+    m_autoAccelValue   = 1.0f;
+    m_wasStartPhase    = true;
 }   // reset
 
 // ----------------------------------------------------------------------------
@@ -88,6 +94,9 @@ void PlayerController::resetInputState()
     m_prev_accel            = 0;
     m_prev_nitro            = false;
     m_time_since_stuck      = 0.0f;
+    m_autoAccelEnabled = false;
+    m_autoAccelValue   = 1.0f;
+    m_wasStartPhase    = true;
     m_controls->reset();
 }   // resetInputState
 
@@ -165,6 +174,7 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         else
             SET_OR_TEST(m_steer_val, m_steer_val_r);
         break;
+    
     case PA_STEER_RIGHT:
         SET_OR_TEST(m_steer_val_r, -value);
         if (value)
@@ -184,7 +194,17 @@ bool PlayerController::action(PlayerAction action, int value, bool dry_run)
         // range [0, Input::MAX_VALUE].
         uint16_t v16 = (uint16_t)value;
         SET_OR_TEST(m_prev_accel, v16);
-        SET_OR_TEST_GETTER(Accel, v16 / (float)Input::MAX_VALUE);
+        float target;
+        if (v16 > 0)
+        {
+            target = v16 / static_cast<float>(Input::MAX_VALUE);
+        }
+        else
+        {
+            target = m_autoAccelValue;
+        }
+        SET_OR_TEST_GETTER(Accel, target);
+
         break;
     }
     case PA_NITRO:
