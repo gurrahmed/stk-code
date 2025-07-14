@@ -55,6 +55,9 @@ private:
     /** The normal of an item. */
     Vec3 m_normal;
 
+    /** Type of the item when this event creates a new item. */
+    ItemState::ItemType m_item_type;
+
     /** Ticks for the item to return, atm used by collecting banana
      *  with bomb to delay the return for banana. */
     int16_t m_ticks_till_return;
@@ -81,7 +84,7 @@ public:
     ItemEventInfo(int ticks, ItemState::ItemType type, int index,
                   int kart_id, const Vec3 &xyz, const Vec3 &normal)
         : m_ticks(ticks), m_index(index), m_kart_id(kart_id), m_xyz(xyz),
-          m_normal(normal), m_ticks_till_return(0)
+          m_normal(normal), m_item_type(type), m_ticks_till_return(0)
     {
         m_type = IEI_NEW;
     }   // ItemEventInfo(new item)
@@ -140,9 +143,9 @@ public:
     // --------------------------------------------------------------------
     /** Returns the type of this item. Note at this stage only bubble gums
      *  can be created during a race. */
-    ItemState::ItemType getNewItemType() const
-    {
-        return ItemState::ITEM_BUBBLEGUM;
+    ItemState::ItemType getNewItemType() const 
+    { 
+        return m_item_type; 
     }   // getNewItemType
 
 };   // class ItemEventInfo
