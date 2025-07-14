@@ -54,7 +54,8 @@ namespace HardwareStats
                 uint8_t codepoint = value[i];
                 if (codepoint <= 0x1f)
                 {
-                    sprintf(temp, "\\u%04x", codepoint);
+                    std::snprintf(temp, sizeof(temp), "\\u%04x", codepoint);
+
                     std::string suffix = value.substr(i + 1);
                     value = value.substr(0, i);
                     value.append(temp);
